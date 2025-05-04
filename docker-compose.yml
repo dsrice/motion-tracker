@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  joint-tracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: joint-tracker
+    volumes:
+      - ./app:/app
+      - ./tmp:/app/tmp
+      - ./output:/app/output
+      # X11ソケットをマウント (GUI表示用)
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+    # ホストのネットワークを使用 (X11表示用)
+    network_mode: "host"
+    # ttyとstdinを開いたままにする (インタラクティブモード)
+    tty: true
+    stdin_open: true
+    command: bash
+
+  joint-tracker-gpu:
+    build:
+      context: .
+      dockerfile: Dockerfile.gpu
+    container_name: joint-tracker-gpu
+    volumes:
+      - ./app:/app
+      - ./tmp:/app/tmp
+      - ./output:/app/output
+      # X11ソケットをマウント (GUI表示用)
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    environment:
+      - DISPLAY=${DISPLAY}
+      # NVIDIA GPUを使用するための環境変数
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=all
+    # ホストのネットワークを使用 (X11表示用)
+    network_mode: "host"
+    # NVIDIAランタイムを使用
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    # ttyとstdinを開いたままにする (インタラクティブモード)
+    tty: true
+    stdin_open: true
+    command: bash
