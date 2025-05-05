@@ -17,7 +17,8 @@ import mediapipe as mp
 
 
 class PoseTracker:
-    def __init__(self, min_detection_confidence=0.5, min_tracking_confidence=0.5, trace_length=30):
+    def __init__(self, min_detection_confidence=0.5, min_tracking_confidence=0.5, trace_length=30, 
+                 body_part='all', show_traces=True):
         """
         関節トラッキングクラスの初期化
 
@@ -29,6 +30,10 @@ class PoseTracker:
             トラッキングの最小信頼度
         trace_length : int
             軌跡を記録するフレーム数
+        body_part : str
+            トラッキングする身体部位 ('upper', 'lower', 'all')
+        show_traces : bool
+            関節の軌跡を表示するかどうか
         """
         # MediaPipeのポーズ検出モジュールを初期化
         self.mp_drawing = mp.solutions.drawing_utils
@@ -41,29 +46,51 @@ class PoseTracker:
         # 関節ごとの軌跡を保存するための辞書
         self.trace_length = trace_length
         self.joint_traces = {}
+        self.body_part = body_part  # トラッキングする身体部位
+        self.show_traces = show_traces  # 軌跡表示フラグ
 
-        # トラッキングする主要な関節のインデックス
-        self.key_joints = {
+        # 上半身の関節
+        self.upper_body_joints = {
             '左手首': self.mp_pose.PoseLandmark.LEFT_WRIST,
             '右手首': self.mp_pose.PoseLandmark.RIGHT_WRIST,
             '左肘': self.mp_pose.PoseLandmark.LEFT_ELBOW,
             '右肘': self.mp_pose.PoseLandmark.RIGHT_ELBOW,
+            '左肩': self.mp_pose.PoseLandmark.LEFT_SHOULDER,
+            '右肩': self.mp_pose.PoseLandmark.RIGHT_SHOULDER
+        }
+
+        # 下半身の関節
+        self.lower_body_joints = {
             '左膝': self.mp_pose.PoseLandmark.LEFT_KNEE,
             '右膝': self.mp_pose.PoseLandmark.RIGHT_KNEE,
             '左足首': self.mp_pose.PoseLandmark.LEFT_ANKLE,
-            '右足首': self.mp_pose.PoseLandmark.RIGHT_ANKLE
+            '右足首': self.mp_pose.PoseLandmark.RIGHT_ANKLE,
+            '左腰': self.mp_pose.PoseLandmark.LEFT_HIP,
+            '右腰': self.mp_pose.PoseLandmark.RIGHT_HIP
         }
+        
+        # 選択されたトラッキング部位に基づいて主要な関節を設定
+        if self.body_part == 'upper':
+            self.key_joints = self.upper_body_joints
+        elif self.body_part == 'lower':
+            self.key_joints = self.lower_body_joints
+        else:  # 'all'
+            self.key_joints = {**self.upper_body_joints, **self.lower_body_joints}
 
         # 各関節の軌跡の色
         self.joint_colors = {
-            '左手首': (255, 0, 0),  # 赤
-            '右手首': (0, 0, 255),  # 青
-            '左肘': (255, 0, 255),  # マゼンタ
-            '右肘': (0, 255, 255),  # シアン
-            '左膝': (255, 255, 0),  # 黄
-            '右膝': (0, 255, 0),  # 緑
-            '左足首': (128, 0, 128),  # 紫
-            '右足首': (0, 128, 128)  # ティール
+            '左手首': (255, 0, 0),      # 赤
+            '右手首': (0, 0, 255),      # 青
+            '左肘': (255, 0, 255),      # マゼンタ
+            '右肘': (0, 255, 255),      # シアン
+            '左肩': (255, 128, 0),      # オレンジ
+            '右肩': (0, 128, 255),      # ライトブルー
+            '左膝': (255, 255, 0),      # 黄
+            '右膝': (0, 255, 0),        # 緑
+            '左足首': (128, 0, 128),    # 紫
+            '右足首': (0, 128, 128),    # ティール
+            '左腰': (128, 64, 0),       # 茶色
+            '右腰': (0, 64, 128)        # 紺
         }
 
         # 各関節の軌跡を初期化
@@ -150,6 +177,10 @@ class PoseTracker:
         frame : ndarray
             軌跡が描画されたフレーム
         """
+        # 軌跡表示が無効の場合は何もせずに返す
+        if not self.show_traces:
+            return frame
+            
         for joint_name, trace in self.joint_traces.items():
             color = self.joint_colors[joint_name]
             # トレース内の点を接続して軌跡を描画
@@ -177,7 +208,7 @@ class PoseTracker:
 
 
 def process_video(input_path, output_path=None, display_video=False, trace_length=30, min_detection_confidence=0.7,
-                  min_tracking_confidence=0.5):
+                  min_tracking_confidence=0.5, body_part='all', show_traces=True):
     """
     ビデオを処理し、人体の関節をトラッキングする
 
@@ -195,6 +226,10 @@ def process_video(input_path, output_path=None, display_video=False, trace_lengt
         検出の最小信頼度
     min_tracking_confidence : float, optional
         トラッキングの最小信頼度
+    body_part : str, optional
+        トラッキングする身体部位 ('upper', 'lower', 'all')
+    show_traces : bool, optional
+        関節の軌跡を表示するかどうか
     """
     # ビデオキャプチャを開く
     cap = cv2.VideoCapture(input_path)
@@ -225,7 +260,9 @@ def process_video(input_path, output_path=None, display_video=False, trace_lengt
     tracker = PoseTracker(
         min_detection_confidence=min_detection_confidence,
         min_tracking_confidence=min_tracking_confidence,
-        trace_length=trace_length
+        trace_length=trace_length,
+        body_part=body_part,
+        show_traces=show_traces
     )
 
     frame_idx = 0
@@ -261,6 +298,19 @@ def process_video(input_path, output_path=None, display_video=False, trace_lengt
             cv2.putText(result_frame, f"姿勢検出: {timestamp}", (10, 30),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
 
+            # 身体部位と軌跡表示の状態を表示
+            body_part_text = {
+                'all': '全身',
+                'upper': '上半身',
+                'lower': '下半身'
+            }.get(body_part, '全身')
+            
+            trace_text = '軌跡表示: 有効' if show_traces else '軌跡表示: 無効'
+            cv2.putText(result_frame, f"トラッキング部位: {body_part_text}", (10, 60),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2)
+            cv2.putText(result_frame, trace_text, (10, 90),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 200, 0), 2)
+        
         # 進捗表示
         progress = (frame_idx / frame_count) * 100
         cv2.putText(result_frame, f"処理中: {progress:.1f}%", (10, height - 20),
@@ -323,6 +373,9 @@ def main():
     parser.add_argument("--detection-confidence", type=float, default=0.7, help="検出の最小信頼度（デフォルト: 0.7）")
     parser.add_argument("--tracking-confidence", type=float, default=0.5,
                         help="トラッキングの最小信頼度（デフォルト: 0.5）")
+    parser.add_argument("-p", "--body-part", choices=['upper', 'lower', 'all'], default='all',
+                        help="トラッキングする身体部位 (upper=上半身, lower=下半身, all=全身) （デフォルト: all）")
+    parser.add_argument("--no-traces", action="store_true", help="関節の軌跡を表示しない")
 
     args = parser.parse_args()
 
@@ -352,7 +405,9 @@ def main():
     print(f"検出信頼度: {args.detection_confidence}")
     print(f"トラッキング信頼度: {args.tracking_confidence}")
     print(f"ウィンドウ表示: {'有効' if args.display else '無効'}")
-
+    print(f"トラッキング部位: {args.body_part}")
+    print(f"軌跡表示: {'無効' if args.no_traces else '有効'}")
+    
     # ビデオ処理を実行
     process_video(
         input_path=args.input,
@@ -360,7 +415,9 @@ def main():
         display_video=args.display,
         trace_length=args.trace,
         min_detection_confidence=args.detection_confidence,
-        min_tracking_confidence=args.tracking_confidence
+        min_tracking_confidence=args.tracking_confidence,
+        body_part=args.body_part,
+        show_traces=not args.no_traces
     )
 
 

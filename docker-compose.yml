@@ -27,7 +27,7 @@ services:
       dockerfile: Dockerfile.gpu
     container_name: joint-tracker-gpu
     volumes:
-      - ./app:/app
+      - ./:/app
       - ./tmp:/app/tmp
       - ./output:/app/output
       # X11ソケットをマウント (GUI表示用)
